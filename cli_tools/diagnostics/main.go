@@ -42,6 +42,56 @@ type logFolder struct {
 	files []string
 }
 
+type cmd struct {
+	path           string
+	args           string
+	outputFileName string
+	// True when the command produces its own file and doesn't need one
+	// created from stdout.
+	cmdProducesFile bool
+}
+
+func (command cmd) run() (outPath string, err error) {
+	outPath = filepath.Join(tmpFolder, command.outputFileName)
+
+	c := exec.Command(command.path)
+	argString := command.args
+
+	if command.cmdProducesFile {
+		// Replace any output file args with that path in a temp folder
+		relPath := command.outputFileName
+		argString = strings.Replace(argString, relPath, outPath, -1)
+	} else {
+		// If the command doesn't produce a file, we need to construct
+		// one from Stdout and Stderr
+		outFile, err := os.Create(outPath)
+		if err != nil {
+			log.Printf("Error creating file %s: %v", outPath, err)
+			return outPath, err
+		}
+		defer func() {
+			if cErr := outFile.Close(); err != nil {
+				err = cErr
+			}
+		}()
+		c.Stdout = outFile
+		c.Stderr = outFile
+	}
+
+	if command.args != "" {
+		c.Args = append(c.Args, strings.Split(argString, " ")...)
+	}
+	err = c.Run()
+	return
+}
+
+func runAll(commands []runner, errCh chan error) []string {
+	paths := make([]string, 0, len(commands))
+
+	for _, command := range commands {
+		path, err := command.run()
+		if err != nil {
+			log.Printf("Error: %s while running %v", err, command)
 func zipFiles(logs []logFolder, outputPath string) (err error) {
 	newFile, err := os.Create(outputPath)
 	if err != nil {
