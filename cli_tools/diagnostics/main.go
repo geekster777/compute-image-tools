@@ -24,7 +24,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -92,6 +94,15 @@ func runAll(commands []runner, errCh chan error) []string {
 		path, err := command.run()
 		if err != nil {
 			log.Printf("Error: %s while running %v", err, command)
+			errCh <- err
+		} else {
+			paths = append(paths, path)
+		}
+	}
+
+	return paths
+}
+
 func zipFiles(logs []logFolder, outputPath string) (err error) {
 	newFile, err := os.Create(outputPath)
 	if err != nil {
